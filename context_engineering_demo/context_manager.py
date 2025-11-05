@@ -25,19 +25,21 @@ class ContextManager:
     4. 上下文构建
     """
 
-    def __init__(self, max_tokens: int = None, workspace: str = None):
+    def __init__(self, max_tokens: int = None, workspace: str = None, llm_client=None):
         """
         初始化上下文管理器
 
         Args:
             max_tokens: 最大token限制（默认使用配置值）
             workspace: 工作空间目录
+            llm_client: LLM客户端实例（用于智能压缩）
         """
         self.max_tokens = max_tokens or default_config.MAX_TOKENS
+        self.llm_client = llm_client
 
         # 初始化各个组件
         self.storage = LayeredStorage(workspace)
-        self.compressor = AU2Compressor()
+        self.compressor = AU2Compressor(llm_client=llm_client)  # 传入llm_client
         self.injector = ContextInjector()
         self.knowledge_base = KnowledgeBase()
 

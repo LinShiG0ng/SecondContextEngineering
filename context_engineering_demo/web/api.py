@@ -61,14 +61,20 @@ class AppState:
         # 加载配置
         self.config = load_config()
 
-        # 初始化上下文管理器
-        max_tokens = self.config.get('context', {}).get('max_tokens', 8000)
-        self.context_manager = ContextManager(max_tokens=max_tokens)
-
-        # 初始化LLM客户端
+        # 初始化LLM客户端（先初始化，用于智能压缩）
         llm_config = self.config.get('llm', {})
         if llm_config.get('api_key'):
             self.llm_client = LLMClient(llm_config)
+            print(f"✨ LLM客户端已初始化: {llm_config.get('provider')} - {llm_config.get('model')}")
+        else:
+            print("⚠️  未配置LLM API，将使用规则匹配Fallback模式")
+
+        # 初始化上下文管理器（传入llm_client以启用智能压缩）
+        max_tokens = self.config.get('context', {}).get('max_tokens', 8000)
+        self.context_manager = ContextManager(
+            max_tokens=max_tokens,
+            llm_client=self.llm_client  # 传入llm_client
+        )
 
         self.initialized = True
 

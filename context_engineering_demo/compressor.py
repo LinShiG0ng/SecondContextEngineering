@@ -1,10 +1,13 @@
 """
 AU2智能压缩算法
 实现8段式压缩流程，包含System Prompt特殊处理
+
+✨ LLM驱动版本：使用大模型API进行智能分析和压缩
 """
 
 import time
-from typing import List, Dict, Tuple, Set
+import json
+from typing import List, Dict, Tuple, Set, Optional
 from collections import defaultdict, Counter
 
 from .utils import count_tokens, extract_entities, extract_code_blocks
@@ -12,12 +15,25 @@ from . import config as default_config
 
 
 class AU2Compressor:
-    """AU2智能压缩器"""
+    """AU2智能压缩器（LLM驱动版本）"""
 
-    def __init__(self):
-        """初始化压缩器"""
+    def __init__(self, llm_client=None):
+        """
+        初始化压缩器
+
+        Args:
+            llm_client: LLM客户端实例（用于智能分析和摘要生成）
+                       如果为None，将使用规则匹配的fallback模式
+        """
         self.target_ratio = default_config.TARGET_COMPRESSION_RATIO
         self.preserve_system = default_config.PRESERVE_SYSTEM_PROMPTS
+        self.llm_client = llm_client
+        self.use_llm = llm_client is not None
+
+        if self.use_llm:
+            print("✨ 使用LLM驱动模式（智能分析）")
+        else:
+            print("⚠️  使用规则匹配模式（Fallback）")
 
     async def compress(self, messages: List[Dict]) -> Dict:
         """
@@ -179,9 +195,105 @@ class AU2Compressor:
 
         return system_prompts, other_messages
 
-    def classify_messages(self, messages: List[Dict]) -> Dict[str, List[Dict]]:
+    async def classify_messages(self, messages: List[Dict]) -> Dict[str, List[Dict]]:
         """
-        阶段1: 消息分类
+        阶段1: 消息分类（LLM驱动 + 规则匹配Fallback）
+
+        Args:
+            messages: 消息列表
+
+        Returns:
+            分类结果字典
+        """
+        if self.use_llm:
+            return await self._classify_messages_llm(messages)
+        else:
+            return self._classify_messages_rules(messages)
+
+    async def _classify_messages_llm(self, messages: List[Dict]) -> Dict[str, List[Dict]]:
+        """
+        使用LLM进行智能消息分类
+
+        Args:
+            messages: 消息列表
+
+        Returns:
+            分类结果字典
+        """
+        try:
+            # 构建分析prompt
+            messages_summary = []
+            for i, msg in enumerate(messages[:20]):  # 限制前20条以避免超长
+                role = msg.get('role', 'unknown')
+                content = msg.get('content', '')[:200]  # 截取前200字符
+                messages_summary.append(f"{i}. [{role}] {content}...")
+
+            prompt = f"""分析以下对话消息，将每条消息分类为以下类别之一：
+- critical: 关键消息（错误报告、重要决策、关键问题）
+- important: 重要消息（功能实现、设计讨论、配置更改）
+- contextual: 上下文消息（解释说明、一般讨论）
+- redundant: 冗余消息（简单确认、重复内容、无关信息）
+
+对话消息：
+{chr(10).join(messages_summary)}
+
+请以JSON格式返回分类结果，格式如下：
+{{
+    "classifications": [
+        {{"index": 0, "category": "critical", "reason": "报告了严重错误"}},
+        {{"index": 1, "category": "important", "reason": "讨论了核心功能实现"}},
+        ...
+    ]
+}}
+
+只返回JSON，不要其他内容。"""
+
+            llm_messages = [{"role": "user", "content": prompt}]
+            response = await self.llm_client.chat(llm_messages, stream=False)
+
+            # 解析LLM响应
+            response_clean = response.strip()
+            if response_clean.startswith("```json"):
+                response_clean = response_clean[7:]
+            if response_clean.startswith("```"):
+                response_clean = response_clean[3:]
+            if response_clean.endswith("```"):
+                response_clean = response_clean[:-3]
+
+            result = json.loads(response_clean.strip())
+            classifications = result.get('classifications', [])
+
+            # 构建分类字典
+            classified = {
+                'critical': [],
+                'important': [],
+                'contextual': [],
+                'redundant': []
+            }
+
+            # 根据LLM分析结果分类
+            for item in classifications:
+                idx = item.get('index')
+                category = item.get('category', 'contextual')
+                if 0 <= idx < len(messages):
+                    classified[category].append(messages[idx])
+
+            # 处理未分类的消息（fallback）
+            classified_indices = {item['index'] for item in classifications}
+            for i, msg in enumerate(messages):
+                if i not in classified_indices:
+                    classified['contextual'].append(msg)
+
+            print(f"  ✨ LLM分类成功")
+            return classified
+
+        except Exception as e:
+            print(f"  ⚠️  LLM分类失败: {e}，使用规则匹配Fallback")
+            return self._classify_messages_rules(messages)
+
+    def _classify_messages_rules(self, messages: List[Dict]) -> Dict[str, List[Dict]]:
+        """
+        使用规则匹配进行消息分类（Fallback）
 
         Args:
             messages: 消息列表
@@ -217,9 +329,97 @@ class AU2Compressor:
 
         return classified
 
-    def extract_entities(self, classified: Dict[str, List[Dict]]) -> Dict[str, List[str]]:
+    async def extract_entities(self, classified: Dict[str, List[Dict]]) -> Dict[str, List[str]]:
         """
-        阶段2: 提取关键实体
+        阶段2: 提取关键实体（LLM驱动 + 规则匹配Fallback）
+
+        Args:
+            classified: 分类后的消息
+
+        Returns:
+            实体字典
+        """
+        if self.use_llm:
+            return await self._extract_entities_llm(classified)
+        else:
+            return self._extract_entities_rules(classified)
+
+    async def _extract_entities_llm(self, classified: Dict[str, List[Dict]]) -> Dict[str, List[str]]:
+        """
+        使用LLM进行智能实体提取
+
+        Args:
+            classified: 分类后的消息
+
+        Returns:
+            实体字典
+        """
+        try:
+            # 收集所有消息内容
+            all_content = []
+            for category in ['critical', 'important', 'contextual']:
+                for msg in classified.get(category, [])[:10]:  # 每类取前10条
+                    content = msg.get('content', '')[:300]  # 限制长度
+                    all_content.append(content)
+
+            combined_content = '\n---\n'.join(all_content)
+
+            prompt = f"""分析以下技术对话内容，提取关键技术实体：
+
+对话内容：
+{combined_content}
+
+请识别并提取：
+1. **文件名**（如 main.py, config.json, app.ts 等）
+2. **函数名**（如 calculate_score, handleSubmit, async_process 等）
+3. **类名**（如 UserManager, DataProcessor, APIClient 等）
+4. **重要变量**（如 API_KEY, MAX_RETRIES, user_data 等）
+5. **错误类型**（如 ValueError, ConnectionError, 500 Internal Server Error 等）
+
+返回JSON格式：
+{{
+    "files": ["file1.py", "file2.js"],
+    "functions": ["func1", "func2"],
+    "classes": ["Class1", "Class2"],
+    "variables": ["var1", "var2"],
+    "errors": ["Error1", "Error2"]
+}}
+
+只返回JSON，不要其他内容。确保每个列表只包含最相关的前10项。"""
+
+            llm_messages = [{"role": "user", "content": prompt}]
+            response = await self.llm_client.chat(llm_messages, stream=False)
+
+            # 解析响应
+            response_clean = response.strip()
+            if response_clean.startswith("```json"):
+                response_clean = response_clean[7:]
+            if response_clean.startswith("```"):
+                response_clean = response_clean[3:]
+            if response_clean.endswith("```"):
+                response_clean = response_clean[:-3]
+
+            entities = json.loads(response_clean.strip())
+
+            # 确保所有键存在
+            for key in ['files', 'functions', 'classes', 'variables', 'errors']:
+                if key not in entities:
+                    entities[key] = []
+
+            # 去重
+            for key in entities:
+                entities[key] = list(set(entities[key]))[:10]  # 限制每类最多10个
+
+            print(f"  ✨ LLM实体提取成功")
+            return entities
+
+        except Exception as e:
+            print(f"  ⚠️  LLM实体提取失败: {e}，使用规则匹配Fallback")
+            return self._extract_entities_rules(classified)
+
+    def _extract_entities_rules(self, classified: Dict[str, List[Dict]]) -> Dict[str, List[str]]:
+        """
+        使用规则匹配进行实体提取（Fallback）
 
         Args:
             classified: 分类后的消息
@@ -399,10 +599,108 @@ class AU2Compressor:
             traceback.print_exc()
             raise
 
-    def generate_summary(self, scored_messages: List[Dict],
+    async def generate_summary(self, scored_messages: List[Dict],
                         entities: Dict, classified: Dict) -> str:
         """
-        阶段5: 生成压缩摘要
+        阶段5: 生成压缩摘要（LLM驱动 + 模板Fallback）
+
+        Args:
+            scored_messages: 评分后的消息
+            entities: 实体字典
+            classified: 分类结果
+
+        Returns:
+            压缩摘要文本
+        """
+        if self.use_llm:
+            return await self._generate_summary_llm(scored_messages, entities, classified)
+        else:
+            return self._generate_summary_template(scored_messages, entities, classified)
+
+    async def _generate_summary_llm(self, scored_messages: List[Dict],
+                                    entities: Dict, classified: Dict) -> str:
+        """
+        使用LLM生成高质量压缩摘要
+
+        Args:
+            scored_messages: 评分后的消息
+            entities: 实体字典
+            classified: 分类结果
+
+        Returns:
+            压缩摘要文本
+        """
+        try:
+            # 收集关键消息内容
+            critical_messages = []
+            for msg in classified.get('critical', [])[:5]:
+                role = msg.get('role', 'unknown')
+                content = msg.get('content', '')[:500]
+                critical_messages.append(f"[{role}] {content}")
+
+            important_messages = []
+            for msg in classified.get('important', [])[:5]:
+                role = msg.get('role', 'unknown')
+                content = msg.get('content', '')[:500]
+                important_messages.append(f"[{role}] {content}")
+
+            # 构建实体信息
+            entities_text = []
+            if entities.get('files'):
+                entities_text.append(f"文件: {', '.join(entities['files'][:5])}")
+            if entities.get('functions'):
+                entities_text.append(f"函数: {', '.join(entities['functions'][:5])}")
+            if entities.get('classes'):
+                entities_text.append(f"类: {', '.join(entities['classes'][:5])}")
+            if entities.get('errors'):
+                entities_text.append(f"错误: {', '.join(entities['errors'][:3])}")
+
+            total_messages = sum(len(msgs) for msgs in classified.values())
+
+            prompt = f"""请将以下技术对话历史压缩为简洁的摘要（200-500 tokens），保留关键信息。
+
+**关键技术实体：**
+{chr(10).join(entities_text)}
+
+**关键消息（Critical）：**
+{chr(10).join(critical_messages) if critical_messages else "无"}
+
+**重要消息（Important）：**
+{chr(10).join(important_messages) if important_messages else "无"}
+
+**总消息数：** {total_messages}条
+
+请生成压缩摘要，要求：
+1. 用第三人称简洁描述对话的技术背景和目标
+2. 突出关键问题、决策和解决方案
+3. 保留重要的技术细节（文件名、函数名、错误类型等）
+4. 说明已解决/未解决的问题
+5. 如果有代码实现，简要说明实现方式
+
+格式要求：
+- 使用Markdown格式
+- 分段清晰（背景、问题、解决方案、状态）
+- 简洁专业，避免冗余
+
+直接输出摘要内容，不要包含"以下是摘要"等引导语。"""
+
+            llm_messages = [{"role": "user", "content": prompt}]
+            summary = await self.llm_client.chat(llm_messages, stream=False)
+
+            # 添加元数据
+            summary_with_meta = f"📋 **对话历史摘要** (AI生成)\n\n{summary.strip()}\n\n_压缩自 {total_messages} 条历史消息_"
+
+            print(f"  ✨ LLM摘要生成成功（{count_tokens(summary_with_meta)} tokens）")
+            return summary_with_meta
+
+        except Exception as e:
+            print(f"  ⚠️  LLM摘要生成失败: {e}，使用模板Fallback")
+            return self._generate_summary_template(scored_messages, entities, classified)
+
+    def _generate_summary_template(self, scored_messages: List[Dict],
+                                   entities: Dict, classified: Dict) -> str:
+        """
+        使用模板生成摘要（Fallback）
 
         Args:
             scored_messages: 评分后的消息
