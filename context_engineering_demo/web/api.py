@@ -146,20 +146,30 @@ async def import_conversation(data: ConversationImport):
     接收JSON格式的对话数据，分析并准备压缩
     """
     try:
+        print(f"\n=== 导入API被调用 ===")
+        print(f"收到消息数量: {len(data.messages)}")
+
         # 确保初始化
         await state.initialize()
 
         messages = [msg.dict() for msg in data.messages]
+        print(f"转换后的消息: {messages[:2] if len(messages) > 2 else messages}")  # 显示前2条
 
         # 分析消息
         total_tokens = sum(count_tokens(m['content']) for m in messages)
         system_prompts = [m for m in messages if m['role'] == 'system']
         other_messages = [m for m in messages if m['role'] != 'system']
 
+        print(f"分析结果:")
+        print(f"  - 总消息数: {len(messages)}")
+        print(f"  - System Prompt: {len(system_prompts)}条")
+        print(f"  - User/Assistant: {len(other_messages)}条")
+        print(f"  - 总Tokens: {total_tokens}")
+
         # 检查是否可以压缩
         can_compress = len(other_messages) >= 5
 
-        return {
+        response_data = {
             "status": "success",
             "message_count": len(messages),
             "system_prompt_count": len(system_prompts),
@@ -169,8 +179,16 @@ async def import_conversation(data: ConversationImport):
             "message": "导入成功" if can_compress else "消息数量不足（需要至少5条对话）"
         }
 
+        print(f"返回响应: status={response_data['status']}, can_compress={can_compress}")
+        print(f"=== 导入API完成 ===\n")
+
+        return response_data
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"导入失败: {str(e)}")
+        import traceback
+        error_detail = f"导入失败: {str(e)}\n{traceback.format_exc()}"
+        print(f"导入错误: {error_detail}")
+        raise HTTPException(status_code=500, detail=error_detail)
 
 
 @app.post("/api/compress")
@@ -184,23 +202,35 @@ async def compress_context(data: CompressionRequest):
     3. 返回压缩后的完整上下文
     """
     try:
+        print(f"\n=== 压缩API被调用 ===")
+        print(f"收到消息数量: {len(data.messages)}")
+
         # 确保初始化
         await state.initialize()
+        print(f"State已初始化: {state.initialized}")
 
         messages = [msg.dict() for msg in data.messages]
+        print(f"转换后的消息: {len(messages)}条")
 
         if len(messages) < 2:
-            raise HTTPException(status_code=400, detail="消息数量不足")
+            raise HTTPException(status_code=400, detail="消息数量不足（至少需要2条）")
 
         # 执行压缩
+        print("开始执行压缩...")
         start_time = time.time()
         compression_result = await state.context_manager.compressor.compress(messages)
         execution_time = time.time() - start_time
+        print(f"压缩完成，耗时: {execution_time:.2f}秒")
 
         # 提取结果
         compressed_messages = compression_result['compressed_messages']
         statistics = compression_result['statistics']
         system_prompts = compression_result['system_prompts']
+
+        print(f"压缩结果:")
+        print(f"  - 原始消息: {len(messages)}条")
+        print(f"  - 压缩后消息: {len(compressed_messages)}条")
+        print(f"  - System Prompt: {len(system_prompts)}条")
 
         # 计算原始tokens
         original_messages = [m for m in messages if m['role'] != 'system']
@@ -210,7 +240,7 @@ async def compress_context(data: CompressionRequest):
         compressed_content = [m for m in compressed_messages if m['role'] != 'system']
         compressed_tokens = sum(count_tokens(m.get('content', '')) for m in compressed_content)
 
-        return {
+        response_data = {
             "status": "success",
             "original": {
                 "messages": messages,
@@ -232,8 +262,18 @@ async def compress_context(data: CompressionRequest):
             }
         }
 
+        print(f"返回响应: status={response_data['status']}")
+        print(f"=== 压缩API完成 ===\n")
+
+        return response_data
+
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"压缩失败: {str(e)}")
+        import traceback
+        error_detail = f"压缩失败: {str(e)}\n{traceback.format_exc()}"
+        print(f"压缩错误: {error_detail}")
+        raise HTTPException(status_code=500, detail=error_detail)
 
 
 @app.post("/api/export")

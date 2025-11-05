@@ -40,6 +40,8 @@ function estimateCost(tokens) {
 async function importConversation() {
     const jsonText = document.getElementById('import-json').value.trim();
 
+    console.log('importConversation() 被调用');
+
     if (!jsonText) {
         showNotification('请输入JSON数据', 'warning');
         return;
@@ -49,6 +51,7 @@ async function importConversation() {
         showLoading('导入中...');
 
         const data = JSON.parse(jsonText);
+        console.log('解析的JSON数据:', data);
 
         const response = await fetch('/api/import', {
             method: 'POST',
@@ -56,10 +59,20 @@ async function importConversation() {
             body: JSON.stringify(data)
         });
 
+        console.log('导入响应状态:', response.status);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('API错误响应:', errorText);
+            throw new Error(`API错误 (${response.status}): ${errorText}`);
+        }
+
         const result = await response.json();
+        console.log('导入结果:', result);
 
         if (result.status === 'success') {
             state.messages = data.messages;
+            console.log('state.messages 已更新:', state.messages);
 
             // 更新界面
             updateStats(result);
@@ -67,10 +80,11 @@ async function importConversation() {
 
             showNotification(`导入成功: ${result.message_count} 条消息`, 'success');
         } else {
-            showNotification('导入失败', 'error');
+            throw new Error(result.detail || '导入失败，状态不是success');
         }
 
     } catch (error) {
+        console.error('导入错误:', error);
         showNotification(`导入失败: ${error.message}`, 'error');
     } finally {
         hideLoading();
@@ -136,13 +150,19 @@ function loadExample() {
 // ===== 执行压缩 =====
 
 async function compress() {
+    console.log('compress() 被调用');
+    console.log('当前消息数量:', state.messages.length);
+    console.log('当前消息:', state.messages);
+
     if (state.messages.length < 2) {
-        showNotification('消息数量不足，无法压缩', 'warning');
+        showNotification('消息数量不足，无法压缩（至少需要2条）', 'warning');
         return;
     }
 
     try {
         showLoading('执行压缩中...');
+
+        console.log('发送压缩请求...');
 
         const response = await fetch('/api/compress', {
             method: 'POST',
@@ -153,7 +173,16 @@ async function compress() {
             })
         });
 
+        console.log('响应状态:', response.status);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('API错误响应:', errorText);
+            throw new Error(`API错误 (${response.status}): ${errorText}`);
+        }
+
         const result = await response.json();
+        console.log('压缩结果:', result);
 
         if (result.status === 'success') {
             // 更新对比数据
@@ -174,9 +203,12 @@ async function compress() {
                 `压缩完成！节省 ${result.statistics.tokens_saved} tokens (${(result.statistics.compression_ratio * 100).toFixed(1)}%)`,
                 'success'
             );
+        } else {
+            throw new Error(result.detail || '压缩失败，状态不是success');
         }
 
     } catch (error) {
+        console.error('压缩错误:', error);
         showNotification(`压缩失败: ${error.message}`, 'error');
     } finally {
         hideLoading();
