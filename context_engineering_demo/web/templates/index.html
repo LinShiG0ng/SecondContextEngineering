@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧠 上下文工程演示系统</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 顶部导航栏 -->
+        <header>
+            <h1>🧠 上下文工程演示系统</h1>
+            <div class="stats-bar">
+                <span>Token: <span id="token-usage">0/8000</span></span>
+                <span>压缩次数: <span id="compression-count">0</span></span>
+                <span>节省: <span id="tokens-saved">0</span> tokens</span>
+            </div>
+        </header>
+
+        <!-- 主要功能区 -->
+        <div class="main-content">
+
+            <!-- 左侧：上下文管理 -->
+            <div class="left-panel">
+                <div class="section">
+                    <h2>📥 导入对话历史</h2>
+                    <textarea id="import-json" placeholder='粘贴JSON格式的对话历史...
+
+示例格式：
+{
+  "messages": [
+    {"role": "system", "content": "你是一个助手"},
+    {"role": "user", "content": "你好"},
+    {"role": "assistant", "content": "你好！有什么可以帮助你的？"}
+  ]
+}'></textarea>
+                    <div class="button-group">
+                        <button onclick="importConversation()" class="primary">导入</button>
+                        <button onclick="loadExample()">加载示例</button>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>🔄 压缩控制</h2>
+                    <div class="compression-info">
+                        <p>当前消息数: <span id="message-count">0</span></p>
+                        <p>总Token数: <span id="total-tokens">0</span></p>
+                        <p>⭐ System Prompt: <span id="system-count">0</span> 条（不压缩）</p>
+                    </div>
+                    <div class="button-group">
+                        <button onclick="compress()" class="primary">执行压缩</button>
+                        <button onclick="reset()" class="danger">重置对话</button>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>📤 导出结果</h2>
+                    <div class="button-group">
+                        <button onclick="exportJSON()">导出JSON</button>
+                        <button onclick="copyToClipboard()">复制到剪贴板</button>
+                    </div>
+                    <pre id="export-output"></pre>
+                </div>
+            </div>
+
+            <!-- 中间：对话区域 -->
+            <div class="center-panel">
+                <div class="section chat-container">
+                    <h2>💬 对话测试</h2>
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="welcome-message">
+                            <p>👋 欢迎使用上下文工程演示系统！</p>
+                            <p>请先导入对话历史或直接开始对话</p>
+                        </div>
+                    </div>
+                    <div class="chat-input">
+                        <textarea id="user-input"
+                                  placeholder="输入消息..."
+                                  onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
+                        <button onclick="sendMessage()" class="primary">
+                            发送
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：压缩效果分析 -->
+            <div class="right-panel">
+                <div class="section">
+                    <h2>📊 压缩前后对比</h2>
+                    <div class="comparison">
+                        <div class="comparison-item">
+                            <h3>压缩前</h3>
+                            <div id="before-stats">
+                                <p>消息数: <span id="before-msg-count">-</span></p>
+                                <p>Tokens: <span id="before-tokens">-</span></p>
+                                <p>预估成本: <span id="before-cost">-</span></p>
+                            </div>
+                        </div>
+                        <div class="comparison-arrow">→</div>
+                        <div class="comparison-item">
+                            <h3>压缩后</h3>
+                            <div id="after-stats">
+                                <p>消息数: <span id="after-msg-count">-</span></p>
+                                <p>Tokens: <span id="after-tokens">-</span></p>
+                                <p>预估成本: <span id="after-cost">-</span></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="improvements">
+                        <h3>效果提升</h3>
+                        <div id="improvements">
+                            <p>Token节省: <span id="token-saving">-</span></p>
+                            <p>成本降低: <span id="cost-reduction">-</span></p>
+                            <p>信息保留: <span id="info-retention">-</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>🧪 质量对比测试</h2>
+                    <input type="text" id="test-query"
+                           placeholder="输入测试问题..."
+                           value="总结一下我们讨论的要点" />
+                    <button onclick="runComparison()" class="primary">
+                        运行对比测试
+                    </button>
+                    <div id="comparison-results"></div>
+                </div>
+
+                <div class="section">
+                    <h2>📈 统计信息</h2>
+                    <button onclick="refreshStats()">刷新统计</button>
+                    <div id="stats-display"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载提示 -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner"></div>
+        <p id="loading-text">处理中...</p>
+    </div>
+
+    <!-- 通知 -->
+    <div id="notification" class="notification"></div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

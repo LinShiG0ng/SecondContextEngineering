@@ -13,6 +13,7 @@
 - ✅ **多LLM API支持**（OpenAI/Anthropic/Ollama）
 - ✅ **System Prompt特殊处理**（完全保留，不压缩）⭐
 - ✅ **命令行交互界面**（真实API对话）
+- ✅ **Web UI可视化界面**（导入/导出/对比测试）⭐
 - ✅ **压缩效果对比测试**（速度/成本/质量）
 
 ## 🌟 核心特性
@@ -93,11 +94,105 @@ LLM_MODEL=gpt-3.5-turbo
 
 ### 3. 运行演示
 
+**方式1：命令行界面**
+
 ```bash
 python -m context_engineering_demo.main
 ```
 
+**方式2：Web UI界面** ⭐ **推荐**
+
+```bash
+python -m context_engineering_demo.app
+```
+
+然后访问：http://127.0.0.1:8000
+
 ## 💬 使用示例
+
+### Web UI界面 ⭐ **推荐使用**
+
+Web UI提供了更直观的可视化操作界面：
+
+**1. 启动Web服务器**
+
+```bash
+python -m context_engineering_demo.app
+
+# 输出：
+# ============================================================
+# 🌐 上下文工程演示系统 - Web UI
+# ============================================================
+#
+# 📍 访问地址: http://127.0.0.1:8000
+# 📖 API文档: http://127.0.0.1:8000/docs
+# ============================================================
+```
+
+**2. 导入对话历史**
+
+在左侧面板"📥 导入对话历史"区域：
+- 点击"加载示例"按钮查看JSON格式
+- 或粘贴你自己的对话历史（从ChatGPT/Claude导出）
+- 点击"导入"按钮
+
+示例JSON格式：
+```json
+{
+  "messages": [
+    {"role": "system", "content": "你是一个Python编程助手"},
+    {"role": "user", "content": "帮我创建一个Flask项目"},
+    {"role": "assistant", "content": "好的，我来帮你创建..."}
+  ]
+}
+```
+
+**3. 执行压缩**
+
+- 导入后会自动分析消息数量和Token使用
+- 顶部显示：System Prompt数量（⭐ 这些不会被压缩）
+- 点击"执行压缩"按钮
+- 右侧面板实时显示压缩前后对比
+
+**4. 查看压缩效果**
+
+右侧"📊 压缩前后对比"面板显示：
+- 压缩前：消息数、Tokens、预估成本
+- 压缩后：消息数、Tokens、预估成本
+- 效果提升：Token节省、成本降低、信息保留率
+
+**5. 运行质量对比测试**
+
+在右侧"🧪 质量对比测试"区域：
+- 输入测试问题（如"总结一下讨论要点"）
+- 点击"运行对比测试"
+- 系统会用相同问题分别测试：
+  - 使用原始上下文的响应
+  - 使用压缩上下文的响应
+- 显示两者的速度、成本、质量对比
+
+**6. 导出压缩结果**
+
+在左侧"📤 导出结果"区域：
+- 点击"导出JSON"
+- 生成OpenAI/Anthropic兼容格式
+- 可直接复制到剪贴板使用
+
+**7. 实时对话测试**
+
+在中间"💬 对话测试"区域：
+- 输入消息直接与AI对话
+- 实时显示Token使用率
+- 达到92%自动触发压缩
+- 查看压缩效果
+
+**Web UI核心优势：**
+- ✅ 可视化操作，更直观
+- ✅ 支持导入外部对话历史
+- ✅ 实时显示压缩效果对比
+- ✅ 一键导出标准格式
+- ✅ 完整的质量对比测试
+- ✅ 响应式设计，支持多设备
 
 ### 命令行交互
 
@@ -205,6 +300,7 @@ Token限制: 8,000
 context_engineering_demo/
 ├── __init__.py              # 包初始化
 ├── main.py                  # 命令行入口 ⭐
+├── app.py                   # Web应用入口 ⭐ 新增
 ├── context_manager.py       # 上下文管理器（核心）⭐
 ├── compressor.py            # AU2智能压缩算法 ⭐
 ├── storage.py               # 三层存储系统
@@ -214,6 +310,16 @@ context_engineering_demo/
 ├── config_loader.py         # 配置加载与管理
 ├── utils.py                 # 工具函数
 ├── config.py                # 默认配置参数
+├── web/                     # Web UI目录 ⭐ 新增
+│   ├── __init__.py
+│   ├── api.py               # FastAPI路由和端点 ⭐
+│   ├── static/              # 静态资源
+│   │   ├── css/
+│   │   │   └── style.css    # 界面样式 ⭐
+│   │   └── js/
+│   │       └── app.js       # 前端逻辑 ⭐
+│   └── templates/           # HTML模板
+│       └── index.html       # 主页面 ⭐
 ├── config.yaml.example      # 配置文件示例
 ├── .env.example             # 环境变量示例
 ├── requirements.txt         # 依赖列表
@@ -373,11 +479,12 @@ assert system_count >= 3  # System Prompt数量不减少
 
 项目已预留以下扩展接口：
 
-- [ ] **Web UI界面**：可视化的导入导出和压缩测试（框架已准备）
+- [x] **Web UI界面**：可视化的导入导出和压缩测试 ⭐ **已完成**
 - [ ] **向量检索**：使用Embedding进行语义相似度检索
 - [ ] **多模态支持**：支持图片、文件等多模态内容
 - [ ] **分布式存储**：支持Redis等分布式缓存
 - [ ] **性能监控**：详细的性能分析和可视化
+- [ ] **WebSocket流式输出**：实时显示压缩进度
 
 ## 🤝 贡献指南
 
@@ -399,7 +506,11 @@ MIT License
 # 1. 安装依赖
 pip install -r requirements.txt
 
-# 2. 运行演示
+# 2A. 运行Web UI（推荐）⭐
+python -m context_engineering_demo.app
+# 然后访问：http://127.0.0.1:8000
+
+# 2B. 或运行命令行界面
 python -m context_engineering_demo.main
 
 # 3. 按照提示配置API
@@ -409,6 +520,15 @@ python -m context_engineering_demo.main
 
 **快速测试压缩效果：**
 
+**Web UI方式（推荐）：**
+1. 启动Web界面：`python -m context_engineering_demo.app`
+2. 点击"加载示例"按钮
+3. 点击"导入"按钮
+4. 点击"执行压缩"按钮
+5. 在右侧查看压缩效果
+6. 输入测试问题，点击"运行对比测试"
+
+**命令行方式：**
 ```bash
 # 进行10轮以上对话，然后输入：
 /compare
