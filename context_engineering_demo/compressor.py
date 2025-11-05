@@ -314,53 +314,90 @@ class AU2Compressor:
         Returns:
             带评分的消息列表
         """
-        scored = []
+        try:
+            print(f"[DEBUG score_messages] 开始评分，消息数量: {len(messages)}")
+            print(f"[DEBUG score_messages] Graph edges数量: {len(graph.get('edges', []))}")
 
-        # 统计实体引用次数
-        entity_counts = Counter()
-        for edge in graph['edges']:
-            entity_counts[edge['from']] += 1
-            entity_counts[edge['to']] += 1
+            scored = []
 
-        current_time = time.time()
+            # 统计实体引用次数
+            entity_counts = Counter()
+            for edge in graph['edges']:
+                entity_counts[edge['from']] += 1
+                entity_counts[edge['to']] += 1
 
-        for i, msg in enumerate(messages):
-            content = msg.get('content', '')
-            timestamp = msg.get('timestamp', current_time - (len(messages) - i) * 60)
+            print(f"[DEBUG score_messages] 实体统计完成，实体数量: {len(entity_counts)}")
+            current_time = time.time()
 
-            # 计算评分因素
-            # 1. 实体重要性（被引用次数）
-            entity_score = 0
-            for entity, count in entity_counts.items():
-                if entity in content:
-                    entity_score += count
+            for i, msg in enumerate(messages):
+                try:
+                    print(f"[DEBUG score_messages] 处理消息 {i+1}/{len(messages)}, role={msg.get('role')}")
 
-            # 2. 时间距离（越近越重要）
-            time_distance = current_time - timestamp
-            time_score = 1.0 / (1.0 + time_distance / 3600)  # 以小时为单位衰减
+                    # 确保content是字符串
+                    content = msg.get('content', '')
+                    if content is None:
+                        content = ''
+                    content = str(content)
 
-            # 3. 内容长度（更长的内容可能更重要）
-            length_score = min(len(content) / 1000, 1.0)
+                    timestamp = msg.get('timestamp', current_time - (len(messages) - i) * 60)
+                    print(f"[DEBUG score_messages] Content长度: {len(content)}, timestamp: {timestamp}")
 
-            # 4. 角色权重（assistant的回答通常更重要）
-            role_weight = 1.5 if msg.get('role') == 'assistant' else 1.0
+                    # 计算评分因素
+                    # 1. 实体重要性（被引用次数）
+                    entity_score = 0
+                    for entity, count in entity_counts.items():
+                        try:
+                            if str(entity) in content:
+                                entity_score += count
+                        except Exception as e:
+                            print(f"[ERROR] 实体检查失败: entity={entity}, error={e}")
+                            continue
 
-            # 综合评分
-            final_score = (
-                entity_score * 0.4 +
-                time_score * 0.3 +
-                length_score * 0.2 +
-                role_weight * 0.1
-            )
+                    # 2. 时间距离（越近越重要）
+                    time_distance = current_time - timestamp
+                    time_score = 1.0 / (1.0 + time_distance / 3600)  # 以小时为单位衰减
 
-            scored_msg = msg.copy()
-            scored_msg['importance_score'] = final_score
-            scored.append(scored_msg)
+                    # 3. 内容长度（更长的内容可能更重要）
+                    length_score = min(len(content) / 1000, 1.0)
 
-        # 按评分排序
-        scored.sort(key=lambda m: m.get('importance_score', 0), reverse=True)
+                    # 4. 角色权重（assistant的回答通常更重要）
+                    role_weight = 1.5 if msg.get('role') == 'assistant' else 1.0
 
-        return scored
+                    # 综合评分
+                    final_score = (
+                        entity_score * 0.4 +
+                        time_score * 0.3 +
+                        length_score * 0.2 +
+                        role_weight * 0.1
+                    )
+
+                    print(f"[DEBUG score_messages] 评分完成: final_score={final_score:.4f}")
+
+                    # 创建评分后的消息（使用字典复制而不是copy方法）
+                    scored_msg = dict(msg)
+                    scored_msg['importance_score'] = final_score
+                    scored.append(scored_msg)
+
+                except Exception as msg_error:
+                    print(f"[ERROR score_messages] 处理消息 {i} 时出错: {msg_error}")
+                    print(f"[ERROR] 消息内容: {msg}")
+                    import traceback
+                    traceback.print_exc()
+                    # 继续处理下一条消息
+                    continue
+
+            # 按评分排序
+            print(f"[DEBUG score_messages] 开始排序，scored消息数量: {len(scored)}")
+            scored.sort(key=lambda m: m.get('importance_score', 0), reverse=True)
+
+            print(f"[DEBUG score_messages] 评分完成，返回 {len(scored)} 条消息")
+            return scored
+
+        except Exception as e:
+            print(f"[ERROR score_messages] 评分过程出错: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
 
     def generate_summary(self, scored_messages: List[Dict],
                         entities: Dict, classified: Dict) -> str:
