@@ -1,0 +1,75 @@
+# 上下文工程演示系统配置文件示例
+# 复制此文件为 config.yaml 并填入你的实际配置
+
+# LLM API配置
+llm:
+  # API提供商: openai / anthropic / ollama / custom
+  provider: openai
+
+  # API密钥（从环境变量或直接填写）
+  api_key: your-api-key-here
+
+  # API Base URL（可选，用于自定义API或代理）
+  # base_url: https://api.openai.com/v1
+
+  # 模型名称
+  model: gpt-3.5-turbo
+
+  # 温度参数 (0-1)
+  temperature: 0.7
+
+  # 是否启用流式输出
+  stream: true
+
+  # API超时时间（秒）
+  timeout: 60
+
+# 上下文管理配置
+context:
+  # 最大token限制
+  max_tokens: 8000
+
+  # 警告阈值 (60%)
+  warning_threshold: 0.6
+
+  # 错误阈值 (80%)
+  error_threshold: 0.8
+
+  # 自动压缩阈值 (92%)
+  auto_compact_threshold: 0.92
+
+  # 目标压缩率 (70%)
+  target_compression_ratio: 0.7
+
+# 存储配置
+storage:
+  # 工作空间目录
+  workspace_dir: ./workspace
+
+  # 短期存储大小（最近N条消息）
+  short_term_size: 5
+
+  # 中期存储大小（最多N条压缩摘要）
+  mid_term_size: 30
+
+# Web UI配置
+web:
+  # 服务器地址
+  host: 127.0.0.1
+
+  # 服务器端口
+  port: 8000
+
+  # 调试模式
+  debug: false
+
+  # 是否启用CORS
+  enable_cors: true
+
+# 系统配置
+system:
+  # 是否完整保留System Prompt（不压缩）
+  preserve_system_prompts: true
+
+  # 详细日志
+  verbose_logging: false
