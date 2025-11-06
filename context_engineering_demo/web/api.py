@@ -327,20 +327,35 @@ async def chat(request: ChatRequest):
     支持在Web界面直接与大模型对话，测试压缩效果
     """
     try:
+        print(f"\n=== 聊天API被调用 ===")
+        print(f"用户消息: {request.message[:100]}...")
+
         # 确保初始化
         await state.initialize()
 
         if not state.llm_client:
             raise HTTPException(status_code=400, detail="LLM客户端未配置")
 
+        print(f"LLM Provider: {state.llm_client.provider}")
+        print(f"LLM Model: {state.llm_client.model}")
+
         # 添加用户消息
         await state.context_manager.add_message('user', request.message)
 
         # 获取上下文
         context = await state.context_manager.get_context(request.message)
+        print(f"上下文消息数: {len(context)}")
 
         # 调用LLM
-        response = await state.llm_client.chat(context, stream=False)
+        print("调用LLM中...")
+        try:
+            response = await state.llm_client.chat(context, stream=False)
+            print(f"LLM响应成功，长度: {len(response)}")
+        except Exception as llm_error:
+            print(f"LLM调用失败: {llm_error}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"LLM调用失败: {str(llm_error)}")
 
         # 添加助手响应
         await state.context_manager.add_message('assistant', response)
@@ -359,6 +374,8 @@ async def chat(request: ChatRequest):
                 compression_triggered = True
                 compression_stats = compression_result['statistics']
 
+        print(f"=== 聊天API完成 ===\n")
+
         return {
             "status": "success",
             "response": response,
@@ -368,7 +385,12 @@ async def chat(request: ChatRequest):
             "compression_stats": compression_stats
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"聊天错误: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"对话失败: {str(e)}")
 
 

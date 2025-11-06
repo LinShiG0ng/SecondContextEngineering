@@ -81,7 +81,7 @@ class LLMClient:
 
     async def _chat_openai(self, messages: List[Dict], stream: bool) -> str:
         """
-        OpenAI API调用
+        OpenAI API调用（兼容通义千问等OpenAI格式的API）
 
         Args:
             messages: 消息列表
@@ -104,36 +104,81 @@ class LLMClient:
             "stream": stream
         }
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            if stream:
-                # 流式输出
-                response_text = ""
-                async with client.stream("POST", url, json=payload, headers=headers) as response:
-                    response.raise_for_status()
-                    async for line in response.aiter_lines():
-                        if line.startswith("data: "):
-                            data = line[6:]
-                            if data == "[DONE]":
-                                break
-                            try:
-                                import json
-                                chunk = json.loads(data)
-                                if 'choices' in chunk and len(chunk['choices']) > 0:
-                                    delta = chunk['choices'][0].get('delta', {})
-                                    content = delta.get('content', '')
-                                    if content:
-                                        response_text += content
-                                        # 实时打印（可选）
-                                        print(content, end='', flush=True)
-                            except:
-                                continue
-                return response_text
-            else:
-                # 非流式输出
-                response = await client.post(url, json=payload, headers=headers)
-                response.raise_for_status()
-                result = response.json()
-                return result['choices'][0]['message']['content']
+        print(f"[LLM Client] 请求 URL: {url}")
+        print(f"[LLM Client] 模型: {self.model}")
+        print(f"[LLM Client] 消息数: {len(messages)}")
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                if stream:
+                    # 流式输出
+                    response_text = ""
+                    async with client.stream("POST", url, json=payload, headers=headers) as response:
+                        response.raise_for_status()
+                        async for line in response.aiter_lines():
+                            if line.startswith("data: "):
+                                data = line[6:]
+                                if data == "[DONE]":
+                                    break
+                                try:
+                                    import json
+                                    chunk = json.loads(data)
+                                    if 'choices' in chunk and len(chunk['choices']) > 0:
+                                        delta = chunk['choices'][0].get('delta', {})
+                                        content = delta.get('content', '')
+                                        if content:
+                                            response_text += content
+                                            # 实时打印（可选）
+                                            print(content, end='', flush=True)
+                                except:
+                                    continue
+                    return response_text
+                else:
+                    # 非流式输出
+                    response = await client.post(url, json=payload, headers=headers)
+                    print(f"[LLM Client] HTTP状态码: {response.status_code}")
+
+                    if response.status_code != 200:
+                        error_text = response.text
+                        print(f"[LLM Client] 错误响应: {error_text}")
+                        raise Exception(f"API返回错误 {response.status_code}: {error_text}")
+
+                    result = response.json()
+                    print(f"[LLM Client] 响应结构: {list(result.keys())}")
+
+                    # 兼容不同的响应格式
+                    if 'choices' in result and len(result['choices']) > 0:
+                        choice = result['choices'][0]
+                        # OpenAI格式
+                        if 'message' in choice:
+                            return choice['message']['content']
+                        # 某些API可能直接返回text
+                        elif 'text' in choice:
+                            return choice['text']
+
+                    # 如果都不匹配，尝试其他字段
+                    if 'output' in result:
+                        # 通义千问可能使用output字段
+                        output = result['output']
+                        if isinstance(output, dict) and 'text' in output:
+                            return output['text']
+                        elif isinstance(output, str):
+                            return output
+
+                    # 最后尝试直接返回text字段
+                    if 'text' in result:
+                        return result['text']
+
+                    print(f"[LLM Client] 完整响应: {result}")
+                    raise Exception(f"无法解析API响应格式: {result}")
+
+        except httpx.HTTPStatusError as e:
+            print(f"[LLM Client] HTTP错误: {e}")
+            print(f"[LLM Client] 响应内容: {e.response.text}")
+            raise Exception(f"API调用失败: {e.response.status_code} - {e.response.text}")
+        except Exception as e:
+            print(f"[LLM Client] 调用失败: {e}")
+            raise
 
     async def _chat_anthropic(self, messages: List[Dict], stream: bool) -> str:
         """
