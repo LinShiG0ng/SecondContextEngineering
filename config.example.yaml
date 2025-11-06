@@ -1,0 +1,138 @@
+# ===============================================
+# 上下文工程演示系统 - 配置文件
+# ===============================================
+#
+# Windows用户使用说明：
+# 1. 复制本文件并重命名为 config.yaml
+# 2. 配置下面的 LLM API 信息
+# 3. 保存后重启 Web 服务器
+#
+# 配置方式（选其一）：
+# - 方式1：使用本配置文件（推荐）
+# - 方式2：使用 .env 文件（见 .env.example）
+# - 方式3：使用环境变量
+#
+# ===============================================
+
+# ============ LLM API 配置 ============
+llm:
+  # API 提供商 (openai / anthropic / ollama)
+  provider: openai
+
+  # 模型名称
+  # OpenAI: gpt-3.5-turbo, gpt-4, gpt-4-turbo
+  # Anthropic: claude-3-5-sonnet-20241022, claude-3-opus-20240229
+  # Ollama: qwen2.5:7b, llama3.1:8b, deepseek-coder:6.7b
+  model: gpt-3.5-turbo
+
+  # API 密钥（必填，Ollama除外）
+  # 获取方式：
+  # - OpenAI: https://platform.openai.com/api-keys
+  # - Anthropic: https://console.anthropic.com/settings/keys
+  api_key: your-api-key-here  # 👈 在这里填入你的 API Key
+
+  # API Base URL（可选，一般不需要修改）
+  # OpenAI: https://api.openai.com/v1
+  # Anthropic: https://api.anthropic.com/v1
+  # Ollama: http://localhost:11434
+  # 国内镜像: https://api.openai-proxy.com/v1 (示例)
+  base_url: null
+
+  # 温度参数 (0.0-2.0)，控制生成的随机性
+  temperature: 0.7
+
+  # 是否使用流式输出
+  stream: false
+
+  # API 超时时间（秒）
+  timeout: 60
+
+
+# ============ 上下文管理配置 ============
+context:
+  # 最大 Token 限制
+  max_tokens: 8000
+
+  # 警告阈值（60%）
+  warning_threshold: 0.6
+
+  # 错误阈值（80%）
+  error_threshold: 0.8
+
+  # 自动压缩阈值（92%）
+  auto_compact_threshold: 0.92
+
+  # 目标压缩比例
+  target_compression_ratio: 0.7
+
+
+# ============ 存储配置 ============
+storage:
+  # 工作空间目录
+  workspace_dir: ./workspace
+
+  # 短期记忆大小（条）
+  short_term_size: 5
+
+  # 中期记忆大小（条）
+  mid_term_size: 20
+
+
+# ============ Web 服务器配置 ============
+web:
+  # 监听地址
+  host: 0.0.0.0
+
+  # 端口号
+  port: 8000
+
+  # 调试模式
+  debug: true
+
+  # 启用 CORS
+  enable_cors: true
+
+
+# ============ 系统配置 ============
+system:
+  # 保留 System Prompt（不压缩）
+  preserve_system_prompts: true
+
+  # 详细日志
+  verbose_logging: true
+
+
+# ===============================================
+# 常见配置示例
+# ===============================================
+
+# 示例1: 使用 OpenAI GPT-3.5
+# llm:
+#   provider: openai
+#   model: gpt-3.5-turbo
+#   api_key: sk-xxxxxxxxxxxxx
+
+# 示例2: 使用 OpenAI GPT-4
+# llm:
+#   provider: openai
+#   model: gpt-4-turbo
+#   api_key: sk-xxxxxxxxxxxxx
+
+# 示例3: 使用 Anthropic Claude
+# llm:
+#   provider: anthropic
+#   model: claude-3-5-sonnet-20241022
+#   api_key: sk-ant-xxxxxxxxxxxxx
+
+# 示例4: 使用 Ollama 本地模型（免费）
+# llm:
+#   provider: ollama
+#   model: qwen2.5:7b
+#   base_url: http://localhost:11434
+
+# 示例5: 使用国内镜像
+# llm:
+#   provider: openai
+#   model: gpt-3.5-turbo
+#   api_key: sk-xxxxxxxxxxxxx
+#   base_url: https://api.openai-proxy.com/v1

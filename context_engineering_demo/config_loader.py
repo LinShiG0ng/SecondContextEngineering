@@ -1,6 +1,6 @@
 """
 配置加载与管理模块
-支持多种配置方式：环境变量、YAML文件、交互式配置向导
+支持多种配置方式：环境变量、YAML文件、.env文件、交互式配置向导
 """
 
 import os
@@ -14,6 +14,40 @@ import getpass
 from . import config as default_config
 
 
+def load_env_file(env_path: str = ".env"):
+    """
+    加载.env文件到环境变量（简单实现，不依赖python-dotenv）
+
+    Args:
+        env_path: .env文件路径
+    """
+    if not os.path.exists(env_path):
+        return
+
+    try:
+        with open(env_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                # 跳过注释和空行
+                if not line or line.startswith('#'):
+                    continue
+                # 解析 KEY=VALUE
+                if '=' in line:
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip()
+                    # 去掉引号
+                    if value.startswith('"') and value.endswith('"'):
+                        value = value[1:-1]
+                    elif value.startswith("'") and value.endswith("'"):
+                        value = value[1:-1]
+                    # 设置到环境变量
+                    os.environ[key] = value
+        print(f"✅ 已加载 .env 配置文件")
+    except Exception as e:
+        print(f"⚠️  加载 .env 文件失败: {e}")
+
+
 class ConfigLoader:
     """配置加载器"""
 
@@ -24,18 +58,40 @@ class ConfigLoader:
         Args:
             config_file: 配置文件路径（可选）
         """
-        self.config_file = config_file or "config.yaml"
+        # 配置文件查找路径优先级（Windows友好）
+        if config_file:
+            self.config_file = config_file
+        else:
+            # 按优先级查找配置文件
+            search_paths = [
+                "config.yaml",           # 当前目录
+                "config.yml",
+                "config.json",
+                ".config.yaml",          # 隐藏配置
+            ]
+            self.config_file = None
+            for path in search_paths:
+                if os.path.exists(path):
+                    self.config_file = path
+                    break
+            # 如果都不存在，使用默认
+            if not self.config_file:
+                self.config_file = "config.yaml"
+
         self.config = {}
 
     def load_config(self) -> Dict:
         """
         加载配置（按优先级）
 
-        优先级：命令行参数 > 环境变量 > 配置文件 > 默认值
+        优先级：.env文件 > 环境变量 > 配置文件 > 默认值
 
         Returns:
             完整的配置字典
         """
+        # 0. 先加载 .env 文件（Windows用户友好）
+        load_env_file(".env")
+
         # 1. 加载默认配置
         self.config = self._load_default_config()
 
@@ -43,6 +99,7 @@ class ConfigLoader:
         if os.path.exists(self.config_file):
             file_config = self._load_from_file(self.config_file)
             self.config = self._merge_configs(self.config, file_config)
+            print(f"✅ 已加载配置文件: {self.config_file}")
 
         # 3. 加载环境变量
         env_config = self._load_from_env()
