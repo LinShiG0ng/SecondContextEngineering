@@ -80,7 +80,7 @@ class AU2Compressor:
 
         # 阶段1: 消息分类
         print("阶段 1/8: 分类消息")
-        classified = self.classify_messages(other_messages)
+        classified = await self.classify_messages(other_messages)
         print(f"  • Critical: {len(classified['critical'])}条 (必须保留)")
         print(f"  • Important: {len(classified['important'])}条 (可压缩)")
         print(f"  • Contextual: {len(classified['contextual'])}条 (提取要点)")
@@ -88,7 +88,7 @@ class AU2Compressor:
 
         # 阶段2: 提取实体
         print("阶段 2/8: 提取实体")
-        entities = self.extract_entities(classified)
+        entities = await self.extract_entities(classified)
         print(f"  • 文件: {entities['files'][:5]}")
         print(f"  • 函数: {entities['functions'][:5]}")
         print(f"  • 类: {entities['classes'][:5]}")
@@ -107,7 +107,7 @@ class AU2Compressor:
 
         # 阶段5: 生成压缩摘要
         print("阶段 5/8: 生成压缩摘要")
-        summary = self.generate_summary(scored_messages, entities, classified)
+        summary = await self.generate_summary(scored_messages, entities, classified)
         summary_tokens = count_tokens(summary)
         print(f"  • 原始: {len(other_messages)}条消息, {original_tokens:,} tokens")
         print(f"  • 摘要: 1条消息, {summary_tokens:,} tokens\n")
