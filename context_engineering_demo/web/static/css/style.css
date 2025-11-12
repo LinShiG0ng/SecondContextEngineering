@@ -66,6 +66,7 @@ header h1 {
     display: grid;
     grid-template-columns: 1fr 2fr 1fr;
     gap: 20px;
+    overflow: hidden;  /* 添加：防止内容溢出 */
 }
 
 /* 面板样式 */
@@ -73,6 +74,8 @@ header h1 {
     display: flex;
     flex-direction: column;
     gap: 20px;
+    min-width: 0;  /* 添加：允许子元素收缩 */
+    overflow: hidden;  /* 添加：防止内容溢出 */
 }
 
 .section {
@@ -80,6 +83,8 @@ header h1 {
     padding: 20px;
     border-radius: 12px;
     box-shadow: var(--shadow);
+    min-width: 0;  /* 添加：允许内容收缩 */
+    overflow-x: hidden;  /* 添加：防止横向溢出 */
 }
 
 .section h2 {
@@ -100,6 +105,9 @@ textarea {
     font-family: 'Courier New', monospace;
     resize: vertical;
     min-height: 150px;
+    word-wrap: break-word;  /* 添加：长单词换行 */
+    overflow-wrap: break-word;  /* 添加：强制换行 */
+    white-space: pre-wrap;  /* 添加：保留格式并换行 */
 }
 
 textarea:focus {
@@ -196,10 +204,12 @@ button:not(.primary):not(.danger) {
 .chat-messages {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;  /* 添加：禁止横向滚动 */
     padding: 15px;
     background: var(--bg-color);
     border-radius: 8px;
     margin-bottom: 15px;
+    max-width: 100%;  /* 添加：限制最大宽度 */
 }
 
 .message {
@@ -207,6 +217,9 @@ button:not(.primary):not(.danger) {
     padding: 12px;
     border-radius: 8px;
     background: white;
+    max-width: 100%;  /* 添加：限制消息最大宽度 */
+    overflow-wrap: break-word;  /* 添加：强制长单词换行 */
+    word-break: break-word;  /* 添加：在任意字符处换行 */
 }
 
 .message.user {
@@ -231,8 +244,12 @@ button:not(.primary):not(.danger) {
 
 .message .content {
     font-size: 14px;
-    white-space: pre-wrap;
-    word-wrap: break-word;
+    white-space: pre-wrap;  /* 保留空格和换行 */
+    word-wrap: break-word;  /* 长单词换行 */
+    overflow-wrap: break-word;  /* 强制换行 */
+    word-break: break-word;  /* 在任意字符处换行 */
+    max-width: 100%;  /* 限制宽度 */
+    overflow-x: auto;  /* 超长内容可横向滚动（备用） */
 }
 
 .welcome-message {
@@ -483,4 +500,88 @@ button:not(.primary):not(.danger) {
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--text-secondary);
+}
+
+/* ========== 文本换行增强 ========== */
+/* 确保所有长文本都能正确换行，防止超出容器 */
+
+/* 代码块样式 */
+.message pre,
+.message code {
+    max-width: 100%;
+    overflow-x: auto;  /* 代码块可横向滚动 */
+    overflow-wrap: break-word;
+    word-break: break-all;  /* 代码可以在任意位置断行 */
+    white-space: pre-wrap;  /* 保留格式但允许换行 */
+    padding: 8px 12px;
+    background: #f1f5f9;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    display: block;
+    margin: 5px 0;
+}
+
+.message code {
+    display: inline;  /* 行内代码 */
+    padding: 2px 6px;
+}
+
+/* 链接样式 */
+.message a {
+    word-break: break-all;  /* 长URL换行 */
+    overflow-wrap: break-word;
+    color: var(--primary-color);
+    text-decoration: underline;
+}
+
+/* 表格样式（防止超宽） */
+.message table {
+    max-width: 100%;
+    overflow-x: auto;
+    display: block;
+    border-collapse: collapse;
+}
+
+.message table td,
+.message table th {
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    word-break: break-word;
+    max-width: 300px;  /* 限制单元格最大宽度 */
+}
+
+/* 长单词、长数字、长URL强制换行 */
+.message .content * {
+    max-width: 100%;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+}
+
+/* JSON/XML等结构化数据 */
+.message .content pre {
+    max-width: 100%;
+    overflow-x: auto;  /* 横向滚动 */
+    background: #1e293b;
+    color: #e2e8f0;
+    padding: 12px;
+    border-radius: 6px;
+}
+
+/* 响应式：小屏幕上进一步优化 */
+@media (max-width: 768px) {
+    .message {
+        padding: 10px;
+        font-size: 13px;
+    }
+
+    .message .content {
+        font-size: 13px;
+    }
+
+    .message table td,
+    .message table th {
+        max-width: 150px;  /* 移动端进一步限制 */
+        font-size: 12px;
+    }
 }
